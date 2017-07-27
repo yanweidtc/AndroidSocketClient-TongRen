@@ -19,8 +19,30 @@
         android:id="@+id/bt_press"
         android:layout_width="wrap_content"
         android:layout_height="wrap_content"
-        android:text="处理事件"/>
+        android:text="处理Patient"/>
 
+    <TextView
+        android:id="@+id/tv_info1"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:text="Default info Message"/>
+
+    <Button
+        android:id="@+id/bt_press1"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:text="处理Notify"/>
+
+    <TextView
+        android:id="@+id/tv_info2"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:text="Default info Message"/>
+    <Button
+        android:id="@+id/bt_press2"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:text="处理Voice"/>
 <!--
     <ImageView
         android:id="@+id/imageView"

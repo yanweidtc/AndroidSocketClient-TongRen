@@ -18,7 +18,7 @@ import java.net.Socket;
 
 public class SendSocketInfoActivity extends Activity {
     public static String TAG = "SendSocketInfoActivity";
-    private static String IpAddress = "10.166.88.29";
+    private static String IpAddress = "192.168.36.108";
     private static int Port = 20001;
     private static Socket socket = null;
 

@@ -19,8 +19,13 @@ import com.vilyever.androidsocketclient.entity.VoiceQueue;
 import com.vilyever.logger.Logger;
 
 import java.io.BufferedReader;
+import java.io.ByteArrayInputStream;
+import java.io.DataInputStream;
+import java.io.EOFException;
 import java.io.IOException;
 import java.io.InputStreamReader;
+import java.net.DatagramPacket;
+import java.net.DatagramSocket;
 import java.net.ServerSocket;
 import java.net.Socket;
 import java.util.ArrayList;
@@ -34,16 +39,21 @@ import java.util.LinkedHashMap;
 public class TestDemoActivity extends Activity{
     public static  String TAG = "TESTDEMO";
     public static  int Port = 20001;
+    public static  final String CODE_FORMAT = "utf-8";
     public   int   InfoType = -1;
     private static final int     ERROR_TYPE              =     -1;
     private static final int     VOICE_TYPE              =      0;
     private static final int     PATIENT_TYPE            =      1;
     private static final int     NOTIFY_TYPE             =      2;
 
-    public  static boolean       isLoadingProgram        =      false;
+    public  static boolean       isLoadingProgram        =      true;
+    public  static boolean       isLoadingNotify         =      true;
+    public  static boolean       isLoadingVoice          =      true;
 
     public static ServerSocket serversocket = null;
     public static TestDemoActivity Instance = null;
+
+    public static DatagramSocket socket = null;
     private static String msginfo  = "msg=dataupdate&areaid=queueinfo&areatype=queue&dataid=38251&data=<br/><br/><br/><br/><br/><br/><br/>刘海超<br/>黄谦<br/>&areaid=windowinfo&areatype=queue&dataid=38251&data=<br/>03诊室";
     private static String msginfo1 = "msg=dataupdate&areaid=notify&areatype=queue&dataid=38251&data=请到01诊室就诊&areaid=l&areatype=lua&dataid=38251&action=addnew&data=<areadata areaid='l' areatype='lua'><script language='lua'>VoiceContent=\"\"请到01诊室就诊\"\";PatInfo=\"\"36号 伊文荟\"\";</script></areadata>\n";
     private static String msginfo2 = "msg=callnumber&count=2&url=/vis/voice/1589887ID192168185175.wav&session_id=19216818517538251";
@@ -59,7 +69,12 @@ public class TestDemoActivity extends Activity{
     private static final int     EVENT_CHANGE_VOICE      =         0x8003;
 
     public TextView tv_mysocketinfo = null;
+    public TextView tv_mysocketinfo1 = null;
+    public TextView tv_mysocketinfo2 = null;
+
     public Button bt_action = null;
+    public Button bt_action1 = null;
+    public Button bt_action2 = null;
     @Override
     protected void onCreate(@Nullable Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
@@ -73,12 +88,36 @@ public class TestDemoActivity extends Activity{
         LoadInfoThread loadInfoThread = new LoadInfoThread();
         loadInfoThread.start();
 
+        LoadInfo1Thread loadInfo1Thread = new LoadInfo1Thread();
+        loadInfo1Thread.start();
+
+        LoadInfo2Thread loadInfo2Thread = new LoadInfo2Thread();
+        loadInfo2Thread.start();
+
         tv_mysocketinfo = (TextView) findViewById(R.id.tv_info);
+        tv_mysocketinfo1 = (TextView) findViewById(R.id.tv_info1);
+        tv_mysocketinfo2 =  (TextView) findViewById(R.id.tv_info2);
+
         bt_action = (Button) findViewById(R.id.bt_press);
         bt_action.setOnClickListener(new View.OnClickListener() {
             @Override
             public void onClick(View v) {
                 isLoadingProgram = false;
+            }
+        });
+
+        bt_action1 = (Button) findViewById(R.id.bt_press1);
+        bt_action1.setOnClickListener(new View.OnClickListener() {
+            @Override
+            public void onClick(View v) {
+                isLoadingNotify = false;
+            }
+        });
+        bt_action2 = (Button) findViewById(R.id.bt_press2);
+        bt_action2.setOnClickListener(new View.OnClickListener() {
+            @Override
+            public void onClick(View v) {
+                isLoadingVoice = false;
             }
         });
     }
@@ -207,15 +246,27 @@ public class TestDemoActivity extends Activity{
          public void run() {
 
              try{
+                 Log.d(TAG,"Create ServerThread");
+                 socket = new DatagramSocket(Port);
+
                  serversocket = new ServerSocket(Port);
                  while (true){
                      Log.d(TAG,"Running count"+count++);
-                     Socket socket = serversocket.accept();
+
+                     byte data[] = new byte[4*1024];
+                     DatagramPacket packet = new DatagramPacket(data,data.length);
+                     socket.receive(packet);
+                     String msg = new String (packet.getData(),packet.getOffset(),packet.getLength(),"gb2312");
+                     //msg = new String(packet.getData(),"utf-8");
+                     //DataInputStream inputStream = new DataInputStream(new ByteArrayInputStream(packet.getData(),packet.getOffset(),packet.getLength()));
+                     //String msg = inputStream.readUTF();
+                     Log.d("George",""+msg);
+/*                     Socket socket = serversocket.accept();
                      BufferedReader buffer = new BufferedReader(
                              new InputStreamReader(socket.getInputStream())
                      );
                      String msg = buffer.readLine();
-                     //Log.d("TextDemo", "my msg"+msg);
+                     Log.d("TextDemo", "my msg"+msg);*/
                      ConvertMsg(msg);
                      Log.d(TAG," Get Message Length"+getMsgLength(msg));
                      InfoType = getDataType(msg);
@@ -256,11 +307,9 @@ public class TestDemoActivity extends Activity{
                          Thread.sleep(1000);
                          continue;
                      }
-                     if (patientQueueArrayList.size()> 0 &&notifyInfoArrayList.size()>0){
+                     if (patientQueueArrayList.size()> 0){
                          isLoadingProgram =true;
                          mHandler.sendEmptyMessage(EVENT_CHANGE_PATIENT);
-                         mHandler.sendEmptyMessage(EVENT_CHANGE_NOTIFY);
-                         mHandler.sendEmptyMessage(EVENT_CHANGE_VOICE);
                      }else {
                          Log.d(TAG,"All list is null ; wait for the socket info");
                          Thread.sleep(1000*1);
@@ -276,6 +325,64 @@ public class TestDemoActivity extends Activity{
          }
      }
 
+    public class LoadInfo1Thread extends Thread{
+
+        @Override
+        public void run() {
+            while (true){
+                try {
+                    if (isLoadingNotify) {
+                        Log.d(TAG,"is Loading Notify ; wait for the socket info");
+                        Thread.sleep(1000);
+                        continue;
+                    }
+                    if (notifyInfoArrayList.size()> 0){
+                        isLoadingNotify =true;
+                        mHandler.sendEmptyMessage(EVENT_CHANGE_NOTIFY);;
+                    }else {
+                        Log.d(TAG,"Notify list is null ; wait for the socket info");
+                        Thread.sleep(1000*1);
+                        isLoadingNotify = true;
+                        continue;
+                    }
+
+                }catch (Exception e){
+                    e.printStackTrace();
+                }
+
+            }
+        }
+    }
+
+    public class LoadInfo2Thread extends Thread{
+
+        @Override
+        public void run() {
+            while (true){
+                try {
+                    if (isLoadingVoice) {
+                        Log.d(TAG,"is Loading Voice ; wait for the socket info");
+                        Thread.sleep(1000);
+                        continue;
+                    }
+                    if (voiceQueueArrayList.size()> 0){
+                        isLoadingVoice =true;
+                        mHandler.sendEmptyMessage(EVENT_CHANGE_VOICE);
+                    }else {
+                        Log.d(TAG,"Voice list is null ; wait for the socket info");
+                        Thread.sleep(1000*1);
+                        isLoadingVoice = true;
+                        continue;
+                    }
+
+                }catch (Exception e){
+                    e.printStackTrace();
+                }
+
+            }
+        }
+    }
+
      @SuppressLint("HandlerLeak")
     final  Handler mHandler = new Handler(){
          @Override
@@ -290,9 +397,11 @@ public class TestDemoActivity extends Activity{
                  case EVENT_CHANGE_NOTIFY:
                      Log.d(TAG, "Get Current Notify List Size"+ notifyInfoArrayList.size());
                      notifyInfoArrayList.remove(0);
+                     tv_mysocketinfo1.setText(notifyInfoArrayList.get(0).notifyData);
                      break;
                  case EVENT_CHANGE_VOICE:
                      Log.d(TAG, "Get Current Voice List Size" + voiceQueueArrayList.size());
+                     tv_mysocketinfo2.setText(voiceQueueArrayList.get(0).url);
                      voiceQueueArrayList.remove(0);
                      break;
                  default:
